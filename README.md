@@ -103,15 +103,19 @@ The controller interface (`ProductsApi`) is **generated from the OpenAPI spec** 
 └── src/
     └── main/java/com/example/spring_boot_postgresql_crud/
         ├── SpringBootPostgresqlCrudApplication.java
-        ├── api/model/         # DTOs as Java records (hand-written)
-        ├── controller/        # HTTP layer, implements ProductsApi
-        ├── service/           # business logic
-        ├── repository/        # Spring Data JPA
-        ├── model/             # JPA entity (Product)
-        └── exception/         # domain exceptions + global advice
+        ├── domain/                              # pure Java; zero infra deps
+        │   ├── model/Product                    # POJO with invariants
+        │   ├── exception/ResourceNotFoundException
+        │   └── port/ProductRepository           # outbound port (interface)
+        ├── application/
+        │   └── service/                         # use case (interface + impl)
+        └── infrastructure/                      # adapters
+            ├── persistence/                     # JPA adapter (entity, mapper, port impl)
+            └── web/                             # web adapter (controller, DTOs)
+                └── dto/                         # OpenAPI DTOs (records)
 ```
 
-The `ProductsApi` interface generated from `docs/api/openapi.yaml` lives under `target/generated-sources/openapi/` and is not committed.
+DDD + Hexagonal layout — see `docs/decisions/ADR-003-pivot-to-ddd-hexagonal.md`. The `ProductsApi` interface generated from `docs/api/openapi.yaml` lives under `target/generated-sources/openapi/` (in package `infrastructure.web`) and is not committed.
 
 ## Documentation
 
