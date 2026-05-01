@@ -1,0 +1,414 @@
+openapi: 3.1.0
+
+info:
+  title: Spring Boot PostgreSQL CRUD — Product API
+  version: 0.1.0
+  description: |
+    REST API for managing **products** in the catalog.
+
+    A `Product` represents an item that can be listed, created, updated and
+    deleted. The catalog is stored in PostgreSQL. This API is the only
+    public-facing surface of the service; persistence and JPA entities are
+    not exposed.
+
+    ## Errors
+    All error responses follow [RFC 9457 — Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457.html)
+    with `Content-Type: application/problem+json`.
+
+    ## Versioning
+    The API is versioned by URL prefix (`/api`). Breaking changes will
+    require a new prefix (e.g. `/api/v2`). See `docs/changelog.md`.
+  contact:
+    name: spring-boot-postgresql-crud maintainers
+    url: https://github.com/example/spring-boot-postgresql-crud
+
+servers:
+  - url: http://localhost:8080
+    description: Local development (Docker compose)
+
+tags:
+  - name: products
+    description: Product catalog operations.
+
+paths:
+  /api/products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List all products
+      description: |
+        Returns the full list of products in the catalog.
+        For now there is no pagination; the response can grow unbounded.
+        Pagination will be added when needed (see `plan-ejecucion.md`,
+        section "Mejoras opcionales").
+      responses:
+        "200":
+          description: Products listed successfully (possibly empty array).
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+              examples:
+                two-products:
+                  summary: Two products
+                  value:
+                    - id: 1
+                      name: Laptop
+                      description: Dell XPS 13
+                      price: 1500.0
+                    - id: 2
+                      name: Mouse
+                      description: Logitech MX Master 3
+                      price: 99.99
+                empty:
+                  summary: Empty catalog
+                  value: []
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    post:
+      operationId: createProduct
+      tags: [products]
+      summary: Create a new product
+      description: |
+        Creates a new product in the catalog. The server assigns the `id`;
+        it must NOT be provided by the client. Returns the created
+        product, including its assigned `id`.
+      requestBody:
+        required: true
+        description: Product attributes for the new entry.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductCreate"
+            examples:
+              laptop:
+                summary: Create a laptop
+                value:
+                  name: Laptop
+                  description: Dell XPS 13
+                  price: 1500.0
+      responses:
+        "201":
+          description: Product created. Includes a `Location` header with the URI of the new product.
+          headers:
+            Location:
+              description: URI of the newly created product.
+              schema:
+                type: string
+                format: uri
+                example: /api/products/1
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+              examples:
+                created:
+                  value:
+                    id: 1
+                    name: Laptop
+                    description: Dell XPS 13
+                    price: 1500.0
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/products/{id}:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: Get a product by ID
+      description: Returns a single product by its numeric ID.
+      responses:
+        "200":
+          description: Product found.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+              examples:
+                laptop:
+                  value:
+                    id: 1
+                    name: Laptop
+                    description: Dell XPS 13
+                    price: 1500.0
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    put:
+      operationId: updateProduct
+      tags: [products]
+      summary: Update an existing product
+      description: |
+        Replaces the attributes of an existing product. The `id` in the
+        path identifies the product; the body cannot change the `id`.
+      requestBody:
+        required: true
+        description: New attributes for the product.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProductUpdate"
+            examples:
+              price-bump:
+                summary: Update price and description
+                value:
+                  name: Laptop
+                  description: Dell XPS 13 (2026 refresh)
+                  price: 1650.0
+      responses:
+        "200":
+          description: Product updated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+              examples:
+                updated:
+                  value:
+                    id: 1
+                    name: Laptop
+                    description: Dell XPS 13 (2026 refresh)
+                    price: 1650.0
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+    delete:
+      operationId: deleteProduct
+      tags: [products]
+      summary: Delete a product
+      description: Removes a product from the catalog. Idempotent in semantics, but a non-existing ID returns 404.
+      responses:
+        "204":
+          description: Product deleted. No body.
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+components:
+
+  parameters:
+    ProductId:
+      name: id
+      in: path
+      required: true
+      description: Numeric, server-assigned identifier of the product.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+        example: 1
+
+  schemas:
+
+    Product:
+      title: Product
+      description: A product as returned by the API. Includes the server-assigned `id`.
+      type: object
+      required: [id, name, price]
+      properties:
+        id:
+          type: integer
+          format: int64
+          minimum: 1
+          description: Server-assigned identifier of the product. Stable across updates.
+          example: 1
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Display name of the product. Required, non-blank.
+          example: Laptop
+        description:
+          type: string
+          maxLength: 1000
+          description: Optional human-readable description.
+          example: Dell XPS 13
+        price:
+          type: number
+          format: double
+          minimum: 0
+          description: Unit price in the catalog's default currency. Must be non-negative.
+          example: 1500.0
+
+    ProductCreate:
+      title: ProductCreate
+      description: Payload for creating a new product. Excludes the `id` (assigned by the server).
+      type: object
+      required: [name, price]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Display name of the product. Required, non-blank.
+          example: Laptop
+        description:
+          type: string
+          maxLength: 1000
+          description: Optional human-readable description.
+          example: Dell XPS 13
+        price:
+          type: number
+          format: double
+          minimum: 0
+          description: Unit price in the catalog's default currency.
+          example: 1500.0
+
+    ProductUpdate:
+      title: ProductUpdate
+      description: Payload for updating an existing product. Same shape as `ProductCreate`.
+      type: object
+      required: [name, price]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Display name of the product. Required, non-blank.
+          example: Laptop
+        description:
+          type: string
+          maxLength: 1000
+          description: Optional human-readable description.
+          example: Dell XPS 13 (2026 refresh)
+        price:
+          type: number
+          format: double
+          minimum: 0
+          description: Unit price in the catalog's default currency.
+          example: 1650.0
+
+    Problem:
+      title: Problem
+      description: |
+        Error payload following [RFC 9457 — Problem Details for HTTP APIs](https://www.rfc-editor.org/rfc/rfc9457.html).
+        Returned with `Content-Type: application/problem+json`.
+      type: object
+      required: [type, title, status, code]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: |
+            URI reference identifying the problem type. Defaults to
+            `about:blank`, in which case `title` SHOULD be the same as the
+            HTTP reason phrase.
+          example: https://api.example.com/problems/product-not-found
+        title:
+          type: string
+          description: Short, human-readable summary of the problem type.
+          example: Product not found
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+          description: HTTP status code generated by the origin server.
+          example: 404
+        detail:
+          type: string
+          description: Human-readable explanation specific to this occurrence of the problem.
+          example: No product exists with id 42
+        instance:
+          type: string
+          format: uri
+          description: URI reference identifying the specific occurrence of the problem.
+          example: /api/products/42
+        code:
+          type: string
+          pattern: "^[A-Z][A-Z0-9_]*$"
+          description: |
+            Machine-readable error code in SCREAMING_SNAKE_CASE.
+            Stable across versions; safe to switch on in clients.
+          example: PRODUCT_NOT_FOUND
+        errors:
+          type: array
+          description: |
+            Optional list of field-level validation errors. Present on
+            `400 Bad Request` responses produced by request validation.
+          items:
+            $ref: "#/components/schemas/FieldError"
+
+    FieldError:
+      title: FieldError
+      description: A single field-level validation error.
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+          description: Name of the field that failed validation (dot-notation for nested fields).
+          example: price
+        message:
+          type: string
+          description: Human-readable validation message.
+          example: must be greater than or equal to 0
+
+  responses:
+
+    NotFound:
+      description: The requested resource does not exist.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          examples:
+            product-not-found:
+              value:
+                type: https://api.example.com/problems/product-not-found
+                title: Product not found
+                status: 404
+                detail: No product exists with id 42
+                instance: /api/products/42
+                code: PRODUCT_NOT_FOUND
+
+    ValidationError:
+      description: The request body or parameters failed validation.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          examples:
+            invalid-price:
+              value:
+                type: https://api.example.com/problems/validation-error
+                title: Validation failed
+                status: 400
+                detail: One or more fields are invalid
+                instance: /api/products
+                code: VALIDATION_ERROR
+                errors:
+                  - field: price
+                    message: must be greater than or equal to 0
+                  - field: name
+                    message: must not be blank
+
+    InternalServerError:
+      description: Unexpected server error.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          examples:
+            internal-error:
+              value:
+                type: https://api.example.com/problems/internal-error
+                title: Internal Server Error
+                status: 500
+                detail: An unexpected error occurred
+                instance: /api/products
+                code: INTERNAL_ERROR
