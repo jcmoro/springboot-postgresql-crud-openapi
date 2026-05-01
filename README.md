@@ -38,19 +38,36 @@ For more detail, see [`docs/operations/development.md`](./docs/operations/develo
 ## Commands
 
 ```bash
-make help          # list all targets
-make up            # bring up the stack
-make down          # stop the stack (keeps data)
-make down-v        # stop the stack and delete the Postgres volume
-make logs          # tail app logs
-make logs-db       # tail Postgres logs
-make psql          # open psql inside the Postgres container
-make test          # unit tests
-make test-it       # integration tests (Testcontainers)
-make verify        # build + all tests + openapi-lint
-make openapi-lint  # validate the OpenAPI spec
-make db-reset      # destroy and recreate the database
-make ci            # verify + build the Docker image
+# Discovery
+make help              # list all targets
+
+# Docker stack
+make up                # bring up the stack (postgres + app when defined)
+make down              # stop the stack (keeps the data volume)
+make down-v            # stop the stack and DELETE the data volume
+make ps                # list stack containers
+make logs              # tail app logs
+make logs-db           # tail Postgres logs
+make psql              # open psql inside the Postgres container
+
+# Build / run
+make build             # compile and package the app jar (mvnw clean package)
+make run               # run the app from the host (Mode A; requires postgres up)
+
+# OpenAPI
+make openapi-generate  # regenerate API code (DTOs + ProductsApi) from openapi.yaml
+make openapi-lint      # validate the OpenAPI spec (alias of openapi-generate)
+
+# Tests
+make test              # unit tests
+make test-it           # integration tests (Testcontainers)
+make verify            # compile + unit + integration tests + spec validation
+
+# DB
+make db-reset          # destroy and recreate the postgres volume (clean slate)
+
+# CI
+make ci                # verify + build the Docker image
 ```
 
 ## API
@@ -67,7 +84,7 @@ OpenAPI 3.0.3 contract in [`docs/api/openapi.yaml`](./docs/api/openapi.yaml).
 
 Errors follow [RFC 9457 `application/problem+json`](https://www.rfc-editor.org/rfc/rfc9457.html).
 
-DTOs and the controller interface (`ProductsApi`) are **generated from the OpenAPI spec** at every build (see [`docs/decisions/ADR-002-openapi-codegen.md`](./docs/decisions/ADR-002-openapi-codegen.md)).
+The controller interface (`ProductsApi`) is **generated from the OpenAPI spec** at every build. DTOs are hand-written Java `record`s under `src/main/java/.../api/model/`; the compiler enforces alignment because `ProductController` implements the generated interface and the interface references the records by name. See [`docs/decisions/ADR-002-openapi-codegen.md`](./docs/decisions/ADR-002-openapi-codegen.md).
 
 ## Repository layout
 
@@ -86,6 +103,7 @@ DTOs and the controller interface (`ProductsApi`) are **generated from the OpenA
 └── src/
     └── main/java/com/example/spring_boot_postgresql_crud/
         ├── SpringBootPostgresqlCrudApplication.java
+        ├── api/model/         # DTOs as Java records (hand-written)
         ├── controller/        # HTTP layer, implements ProductsApi
         ├── service/           # business logic
         ├── repository/        # Spring Data JPA
@@ -93,7 +111,7 @@ DTOs and the controller interface (`ProductsApi`) are **generated from the OpenA
         └── exception/         # domain exceptions + global advice
 ```
 
-DTOs and the `ProductsApi` interface generated from `docs/api/openapi.yaml` live under `target/generated-sources/openapi/` and are not committed.
+The `ProductsApi` interface generated from `docs/api/openapi.yaml` lives under `target/generated-sources/openapi/` and is not committed.
 
 ## Documentation
 
