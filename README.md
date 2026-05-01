@@ -13,7 +13,7 @@ CRUD REST de `Product` construido con **Spring Boot 3.5** y **PostgreSQL 16**, e
 | Build | Maven (`mvnw`) |
 | BD | PostgreSQL 16 |
 | Tests | JUnit 5, MockMvc, Testcontainers |
-| Contrato API | OpenAPI 3.1.0 |
+| Contrato API | OpenAPI 3.0.3 |
 | Runtime | Docker + Docker Compose |
 | Comandos | `make` |
 
@@ -55,7 +55,7 @@ make ci            # verify + build de la imagen Docker
 
 ## API
 
-Contrato OpenAPI 3.1.0 en [`docs/api/openapi.yaml`](./docs/api/openapi.yaml).
+Contrato OpenAPI 3.0.3 en [`docs/api/openapi.yaml`](./docs/api/openapi.yaml).
 
 | Método | Ruta                  | Acción          |
 |--------|-----------------------|-----------------|
