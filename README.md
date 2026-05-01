@@ -1,23 +1,23 @@
 # spring-boot-postgresql-crud
 
-CRUD REST de `Product` construido con **Spring Boot 3.5** y **PostgreSQL 16**, ejecutado íntegramente en Docker. Proyecto de referencia/aprendizaje basado en [este artículo de Medium](https://rameshfadatare.medium.com/spring-boot-crud-example-with-postgresql-926c87f0129a) y adaptado al subset pragmático definido en [`docs/decisions/ADR-001-pragmatic-subset.md`](./docs/decisions/ADR-001-pragmatic-subset.md).
+REST CRUD for `Product`, built with **Spring Boot 3.5** and **PostgreSQL 16**, executed entirely in Docker.
 
 ---
 
 ## Stack
 
-| Área | Tecnología |
+| Area | Technology |
 |---|---|
-| Lenguaje | Java 17 |
+| Language | Java 17 |
 | Framework | Spring Boot 3.5.14 (Spring MVC, Spring Data JPA) |
 | Build | Maven (`mvnw`) |
-| BD | PostgreSQL 16 |
+| Database | PostgreSQL 16 |
 | Tests | JUnit 5, MockMvc, Testcontainers |
-| Contrato API | OpenAPI 3.0.3 |
+| API contract | OpenAPI 3.0.3 |
 | Runtime | Docker + Docker Compose |
-| Comandos | `make` |
+| Commands | `make` |
 
-## Pre-requisitos
+## Prerequisites
 
 - JDK 17
 - Docker Desktop (Compose v2)
@@ -26,88 +26,91 @@ CRUD REST de `Product` construido con **Spring Boot 3.5** y **PostgreSQL 16**, e
 ## Quick start
 
 ```bash
-# Levantar el stack completo (Postgres + app)
+# Bring up the full stack (Postgres + app)
 make up
 
-# Probar
+# Try it
 curl http://localhost:8080/api/products
 ```
 
-Para más detalle, ver [`docs/operations/development.md`](./docs/operations/development.md).
+For more detail, see [`docs/operations/development.md`](./docs/operations/development.md).
 
-## Comandos
+## Commands
 
 ```bash
-make help          # listar todos los targets
-make up            # levantar stack
-make down          # parar stack (mantiene datos)
-make down-v        # parar y borrar volumen de Postgres
-make logs          # logs de la app
-make logs-db       # logs de Postgres
-make psql          # abrir psql dentro del contenedor de Postgres
-make test          # tests unitarios
-make test-it       # tests de integración (Testcontainers)
-make verify        # build + todos los tests + openapi-lint
-make openapi-lint  # validar el spec OpenAPI
-make db-reset      # destruir y recrear la BD
-make ci            # verify + build de la imagen Docker
+make help          # list all targets
+make up            # bring up the stack
+make down          # stop the stack (keeps data)
+make down-v        # stop the stack and delete the Postgres volume
+make logs          # tail app logs
+make logs-db       # tail Postgres logs
+make psql          # open psql inside the Postgres container
+make test          # unit tests
+make test-it       # integration tests (Testcontainers)
+make verify        # build + all tests + openapi-lint
+make openapi-lint  # validate the OpenAPI spec
+make db-reset      # destroy and recreate the database
+make ci            # verify + build the Docker image
 ```
 
 ## API
 
-Contrato OpenAPI 3.0.3 en [`docs/api/openapi.yaml`](./docs/api/openapi.yaml).
+OpenAPI 3.0.3 contract in [`docs/api/openapi.yaml`](./docs/api/openapi.yaml).
 
-| Método | Ruta                  | Acción          |
-|--------|-----------------------|-----------------|
-| GET    | `/api/products`       | Listar          |
-| GET    | `/api/products/{id}`  | Obtener por ID  |
-| POST   | `/api/products`       | Crear           |
-| PUT    | `/api/products/{id}`  | Actualizar      |
-| DELETE | `/api/products/{id}`  | Eliminar        |
+| Method | Path                  | Action     |
+|--------|-----------------------|------------|
+| GET    | `/api/products`       | List       |
+| GET    | `/api/products/{id}`  | Get by ID  |
+| POST   | `/api/products`       | Create     |
+| PUT    | `/api/products/{id}`  | Update     |
+| DELETE | `/api/products/{id}`  | Delete     |
 
-Errores con formato [RFC 9457 `application/problem+json`](https://www.rfc-editor.org/rfc/rfc9457.html).
+Errors follow [RFC 9457 `application/problem+json`](https://www.rfc-editor.org/rfc/rfc9457.html).
 
-## Estructura del repositorio
+DTOs and the controller interface (`ProductsApi`) are **generated from the OpenAPI spec** at every build (see [`docs/decisions/ADR-002-openapi-codegen.md`](./docs/decisions/ADR-002-openapi-codegen.md)).
+
+## Repository layout
 
 ```
 .
-├── CLAUDE.md                  # reglas para Claude Code
-├── Dockerfile                 # imagen multi-stage de la app
-├── Makefile                   # targets de make
-├── README.md                  # este archivo
+├── CLAUDE.md                  # operating rules for Claude Code
+├── Dockerfile                 # multi-stage app image
+├── Makefile                   # make targets
+├── README.md                  # this file
 ├── pom.xml
 ├── mvnw, mvnw.cmd, .mvn/
 ├── docker/
 │   ├── docker-compose.yml     # stack: postgres + app
-│   └── initdb.d/              # scripts SQL de inicialización (opcional)
-├── docs/                      # documentación (ver docs/README.md)
+│   └── initdb.d/              # SQL bootstrap scripts (optional)
+├── docs/                      # documentation (see docs/README.md)
 └── src/
-    ├── main/java/com/example/spring_boot_postgresql_crud/
-    │   ├── SpringBootPostgresqlCrudApplication.java
-    │   ├── controller/        # capa HTTP, expone DTOs
-    │   ├── service/           # lógica de negocio
-    │   ├── repository/        # Spring Data JPA
-    │   ├── model/             # entidades JPA + DTOs (records)
-    │   └── exception/         # excepciones de dominio + advice global
-    └── test/java/...
+    └── main/java/com/example/spring_boot_postgresql_crud/
+        ├── SpringBootPostgresqlCrudApplication.java
+        ├── controller/        # HTTP layer, implements ProductsApi
+        ├── service/           # business logic
+        ├── repository/        # Spring Data JPA
+        ├── model/             # JPA entity (Product)
+        └── exception/         # domain exceptions + global advice
 ```
 
-## Documentación
+DTOs and the `ProductsApi` interface generated from `docs/api/openapi.yaml` live under `target/generated-sources/openapi/` and are not committed.
 
-- [Plan de ejecución](./docs/plan-ejecucion.md) — pasos para construir el proyecto.
-- [Changelog](./docs/changelog.md) — cambios en API y BD.
-- [Decisiones (ADRs)](./docs/decisions/) — arquitectura y stack.
-- [Operations](./docs/operations/) — setup local, runbook, troubleshooting.
-- [API](./docs/api/) — contrato OpenAPI.
+## Documentation
 
-## Convenciones
+- [Execution plan](./docs/plan-ejecucion.md) — step-by-step plan for building the project.
+- [Changelog](./docs/changelog.md) — API and DB schema changes.
+- [Decisions (ADRs)](./docs/decisions/) — architecture and stack rationale.
+- [Operations](./docs/operations/) — local setup, runbook, troubleshooting.
+- [API](./docs/api/) — OpenAPI contract.
 
-- **OpenAPI-first:** el spec se actualiza antes (o a la vez) que el código.
-- **Docker-only:** la app corre siempre en contenedor.
-- **No mocks de BD:** los tests de integración usan Testcontainers contra Postgres real.
-- **Constructor injection** en todos los beans.
-- **Excepciones de dominio**, no `RuntimeException` crudo.
+## Conventions
 
-## Licencia
+- **OpenAPI-first:** the spec is updated before (or alongside) the code.
+- **Docker-only:** the app always runs inside a container.
+- **No DB mocks:** integration tests use Testcontainers against real Postgres.
+- **Constructor injection** everywhere.
+- **Domain exceptions**, not raw `RuntimeException`.
 
-Proyecto educativo, sin licencia comercial.
+## License
+
+Educational project, no commercial license.
