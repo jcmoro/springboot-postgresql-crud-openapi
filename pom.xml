@@ -85,8 +85,8 @@
                     <output>${project.build.directory}/generated-sources/openapi</output>
                     <apiPackage>com.example.spring_boot_postgresql_crud.api</apiPackage>
                     <modelPackage>com.example.spring_boot_postgresql_crud.api.model</modelPackage>
+                    <invokerPackage>com.example.spring_boot_postgresql_crud.api</invokerPackage>
                     <modelNameSuffix>DTO</modelNameSuffix>
-                    <validateSpec>true</validateSpec>
                     <generateApiTests>false</generateApiTests>
                     <generateApiDocumentation>false</generateApiDocumentation>
                     <generateModelTests>false</generateModelTests>
