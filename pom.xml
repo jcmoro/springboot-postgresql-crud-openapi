@@ -30,6 +30,9 @@
         <java.version>17</java.version>
         <openapi-generator.version>7.10.0</openapi-generator.version>
         <swagger-annotations.version>2.2.25</swagger-annotations.version>
+        <!-- Override Spring Boot 3.5.14's managed postgresql 42.7.10 to fix
+             CVE-2026-42198 (unbounded PBKDF2 iterations in SCRAM auth, 7.5 high). -->
+        <postgresql.version>42.7.11</postgresql.version>
     </properties>
     <dependencies>
         <dependency>
@@ -78,33 +81,6 @@
                 <groupId>org.openapitools</groupId>
                 <artifactId>openapi-generator-maven-plugin</artifactId>
                 <version>${openapi-generator.version}</version>
-                <configuration>
-                    <inputSpec>${project.basedir}/docs/api/openapi.yaml</inputSpec>
-                    <generatorName>spring</generatorName>
-                    <library>spring-boot</library>
-                    <output>${project.build.directory}/generated-sources/openapi</output>
-                    <apiPackage>com.example.spring_boot_postgresql_crud.api</apiPackage>
-                    <modelPackage>com.example.spring_boot_postgresql_crud.api.model</modelPackage>
-                    <invokerPackage>com.example.spring_boot_postgresql_crud.api</invokerPackage>
-                    <modelNameSuffix>DTO</modelNameSuffix>
-                    <generateApiTests>false</generateApiTests>
-                    <generateApiDocumentation>false</generateApiDocumentation>
-                    <generateModelTests>false</generateModelTests>
-                    <generateModelDocumentation>false</generateModelDocumentation>
-                    <generateSupportingFiles>false</generateSupportingFiles>
-                    <configOptions>
-                        <interfaceOnly>true</interfaceOnly>
-                        <useSpringBoot3>true</useSpringBoot3>
-                        <useTags>true</useTags>
-                        <useBeanValidation>true</useBeanValidation>
-                        <performBeanValidation>true</performBeanValidation>
-                        <dateLibrary>java8</dateLibrary>
-                        <openApiNullable>false</openApiNullable>
-                        <useRecord>true</useRecord>
-                        <skipDefaultInterface>true</skipDefaultInterface>
-                        <useSwaggerUI>false</useSwaggerUI>
-                    </configOptions>
-                </configuration>
                 <executions>
                     <execution>
                         <id>generate-products-api</id>
@@ -112,6 +88,33 @@
                         <goals>
                             <goal>generate</goal>
                         </goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/docs/api/openapi.yaml</inputSpec>
+                            <generatorName>spring</generatorName>
+                            <library>spring-boot</library>
+                            <output>${project.build.directory}/generated-sources/openapi</output>
+                            <apiPackage>com.example.spring_boot_postgresql_crud.api</apiPackage>
+                            <modelPackage>com.example.spring_boot_postgresql_crud.api.model</modelPackage>
+                            <invokerPackage>com.example.spring_boot_postgresql_crud.api</invokerPackage>
+                            <modelNameSuffix>DTO</modelNameSuffix>
+                            <generateModels>false</generateModels>
+                            <generateApiTests>false</generateApiTests>
+                            <generateApiDocumentation>false</generateApiDocumentation>
+                            <generateModelTests>false</generateModelTests>
+                            <generateModelDocumentation>false</generateModelDocumentation>
+                            <generateSupportingFiles>false</generateSupportingFiles>
+                            <configOptions>
+                                <interfaceOnly>true</interfaceOnly>
+                                <useSpringBoot3>true</useSpringBoot3>
+                                <useTags>true</useTags>
+                                <useBeanValidation>true</useBeanValidation>
+                                <performBeanValidation>true</performBeanValidation>
+                                <dateLibrary>java8</dateLibrary>
+                                <openApiNullable>false</openApiNullable>
+                                <skipDefaultInterface>true</skipDefaultInterface>
+                                <useSwaggerUI>false</useSwaggerUI>
+                            </configOptions>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>
