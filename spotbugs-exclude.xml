@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter
+        xmlns="https://github.com/spotbugs/filter/3.0.0"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="https://github.com/spotbugs/filter/3.0.0 https://raw.githubusercontent.com/spotbugs/spotbugs/master/spotbugs/etc/findbugsfilter.xsd">
+
+    <!--
+      Suppressions are minimal: each entry corresponds to a real finding that
+      we deliberately accept. If a new pattern starts firing, prefer fixing
+      the code over adding here (per ADR-004).
+
+      To audit what SpotBugs actually flags, replace this file with an empty
+      <FindBugsFilter/> and run `make spotbugs`.
+    -->
+
+    <!-- Spring constructor injection inherently "stores an externally mutable
+         object" (the bean dependency). Intended pattern. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2"/>
+        <Class name="com.example.spring_boot_postgresql_crud.application.service.ProductServiceImpl"/>
+    </Match>
+
+    <!-- ProblemDTO is a record whose `errors` component is a List<FieldErrorDTO>.
+         Records store the caller's reference verbatim (canonical constructor
+         + accessor). Defensive copies would defeat the contract semantics:
+         the spec describes errors[] as a plain array. The risk is bounded
+         because ProblemDTO is built once by the global exception handler
+         and serialised to JSON immediately. -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP,EI_EXPOSE_REP2"/>
+        <Class name="com.example.spring_boot_postgresql_crud.infrastructure.web.dto.ProblemDTO"/>
+    </Match>
+</FindBugsFilter>
