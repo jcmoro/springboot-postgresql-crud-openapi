@@ -10,12 +10,14 @@ REST CRUD for `Product`, built with **Spring Boot 3.5** and **PostgreSQL 16**, e
 |---|---|
 | Language | Java 17 |
 | Framework | Spring Boot 3.5.14 (Spring MVC, Spring Data JPA) |
+| Architecture | DDD + Hexagonal (Ports & Adapters) — see `docs/decisions/ADR-003-pivot-to-ddd-hexagonal.md` |
 | Build | Maven (`mvnw`) |
 | Database | PostgreSQL 16 |
-| Tests | JUnit 5, MockMvc, Testcontainers |
-| API contract | OpenAPI 3.0.3 |
+| Tests | JUnit 5 + AssertJ, MockMvc, Testcontainers |
+| Static analysis | SpotBugs 4.8 + FindSecBugs, Checkstyle 10.21 |
+| API contract | OpenAPI 3.0.3 (codegen via `openapi-generator-maven-plugin`) |
 | Runtime | Docker + Docker Compose |
-| Commands | `make` |
+| Commands | `make` (grouped help via `make help`) |
 
 ## Prerequisites
 
@@ -37,34 +39,44 @@ For more detail, see [`docs/operations/development.md`](./docs/operations/develo
 
 ## Commands
 
+`make help` lists all targets grouped by section. Quick reference:
+
 ```bash
-# Discovery
-make help              # list all targets
+# General
+make help              # grouped help
 
 # Docker stack
-make up                # bring up the stack (postgres + app when defined)
+make up                # bring up the stack (postgres + app)
 make down              # stop the stack (keeps the data volume)
-make down-v            # stop the stack and DELETE the data volume
+make down-v            # stop and DELETE the data volume
 make ps                # list stack containers
 make logs              # tail app logs
 make logs-db           # tail Postgres logs
 make psql              # open psql inside the Postgres container
 
-# Build / run
-make build             # compile and package the app jar (mvnw clean package)
+# Build & run
+make build             # compile and package the app jar
 make run               # run the app from the host (Mode A; requires postgres up)
 
 # OpenAPI
-make openapi-generate  # regenerate API code (DTOs + ProductsApi) from openapi.yaml
+make openapi-generate  # regenerate ProductsApi from openapi.yaml
 make openapi-lint      # validate the OpenAPI spec (alias of openapi-generate)
 
-# Tests
-make test              # unit tests
-make test-it           # integration tests (Testcontainers)
-make verify            # compile + unit + integration tests + spec validation
+# Static analysis
+make spotbugs          # SpotBugs + FindSecBugs
+make spotbugs-report   # generate target/spotbugs.html
+make checkstyle        # Checkstyle
+make lint              # spotbugs + checkstyle
 
-# DB
-make db-reset          # destroy and recreate the postgres volume (clean slate)
+# Tests
+make test              # unit tests only (surefire, no Docker)
+make test-it           # integration tests only (failsafe; requires Docker)
+make verify            # compile + unit + integration + lint — full pre-CI gate (Docker required)
+make verify-no-it      # compile + unit + lint, skipping integration tests (no Docker)
+
+# Database
+make db-reset          # destroy and recreate the postgres volume
+make fixtures          # reset products table and load 5 sample rows (requires `make up`)
 
 # CI
 make ci                # verify + build the Docker image
@@ -84,34 +96,40 @@ OpenAPI 3.0.3 contract in [`docs/api/openapi.yaml`](./docs/api/openapi.yaml).
 
 Errors follow [RFC 9457 `application/problem+json`](https://www.rfc-editor.org/rfc/rfc9457.html).
 
-The controller interface (`ProductsApi`) is **generated from the OpenAPI spec** at every build. DTOs are hand-written Java `record`s under `src/main/java/.../api/model/`; the compiler enforces alignment because `ProductController` implements the generated interface and the interface references the records by name. See [`docs/decisions/ADR-002-openapi-codegen.md`](./docs/decisions/ADR-002-openapi-codegen.md).
+The controller interface (`ProductsApi`) is **generated from the OpenAPI spec** at every build. DTOs are hand-written Java `record`s under `src/main/java/.../infrastructure/web/dto/`; the compiler enforces alignment because `ProductController` implements the generated interface and the interface references the records by name. See [`docs/decisions/ADR-002-openapi-codegen.md`](./docs/decisions/ADR-002-openapi-codegen.md).
 
 ## Repository layout
 
 ```
 .
-├── CLAUDE.md                  # operating rules for Claude Code
-├── Dockerfile                 # multi-stage app image
-├── Makefile                   # make targets
-├── README.md                  # this file
+├── CLAUDE.md                       # operating rules for Claude Code
+├── Dockerfile                      # multi-stage app image
+├── Makefile                        # make targets (grouped via ##@)
+├── README.md                       # this file
 ├── pom.xml
 ├── mvnw, mvnw.cmd, .mvn/
+├── checkstyle.xml                  # Checkstyle ruleset
+├── checkstyle-suppressions.xml     # Checkstyle suppressions
+├── spotbugs-exclude.xml            # SpotBugs filter file
 ├── docker/
-│   ├── docker-compose.yml     # stack: postgres + app
-│   └── initdb.d/              # SQL bootstrap scripts (optional)
-├── docs/                      # documentation (see docs/README.md)
+│   ├── docker-compose.yml          # stack: postgres + app
+│   └── initdb.d/                   # SQL bootstrap scripts (optional)
+├── docs/                           # documentation (see docs/README.md)
 └── src/
     └── main/java/com/example/spring_boot_postgresql_crud/
         ├── SpringBootPostgresqlCrudApplication.java
         ├── domain/                              # pure Java; zero infra deps
-        │   ├── model/Product                    # POJO with invariants
+        │   ├── model/Product                    # final POJO with invariants
         │   ├── exception/ResourceNotFoundException
         │   └── port/ProductRepository           # outbound port (interface)
         ├── application/
         │   └── service/                         # use case (interface + impl)
         └── infrastructure/                      # adapters
             ├── persistence/                     # JPA adapter (entity, mapper, port impl)
-            └── web/                             # web adapter (controller, DTOs)
+            └── web/                             # web adapter
+                ├── ProductController            # implements generated ProductsApi
+                ├── ProductWebMapper             # Domain ↔ DTO
+                ├── GlobalExceptionHandler       # RFC 9457 error mapping
                 └── dto/                         # OpenAPI DTOs (records)
 ```
 
@@ -121,17 +139,19 @@ DDD + Hexagonal layout — see `docs/decisions/ADR-003-pivot-to-ddd-hexagonal.md
 
 - [Execution plan](./docs/plan-ejecucion.md) — step-by-step plan for building the project.
 - [Changelog](./docs/changelog.md) — API and DB schema changes.
-- [Decisions (ADRs)](./docs/decisions/) — architecture and stack rationale.
-- [Operations](./docs/operations/) — local setup, runbook, troubleshooting.
-- [API](./docs/api/) — OpenAPI contract.
+- [Decisions (ADRs)](./docs/decisions/README.md) — architecture and stack rationale.
+- [Operations](./docs/operations/README.md) — local setup, runbook, troubleshooting.
+- [API](./docs/api/README.md) — OpenAPI contract.
 
 ## Conventions
 
 - **OpenAPI-first:** the spec is updated before (or alongside) the code.
+- **DDD + Hexagonal:** `domain/` is pure Java with zero infrastructure imports; ports live in `domain/port/`, adapters in `infrastructure/`.
 - **Docker-only:** the app always runs inside a container.
 - **No DB mocks:** integration tests use Testcontainers against real Postgres.
 - **Constructor injection** everywhere.
 - **Domain exceptions**, not raw `RuntimeException`.
+- **Static analysis** (`make lint`) is part of `make verify`.
 
 ## License
 
