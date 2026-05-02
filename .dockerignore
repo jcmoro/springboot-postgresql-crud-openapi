@@ -1,0 +1,16 @@
+target/
+.git/
+.idea/
+.vscode/
+*.iml
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE / OS
+.DS_Store
+Thumbs.db
+
+# Don't ship the docs/decisions etc into the image, but keep docs/api/ for OpenAPI codegen.
+docs/decisions/
+docs/operations/
+docs/*.md
+docs/README.md

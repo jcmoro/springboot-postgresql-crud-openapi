@@ -33,7 +33,38 @@
         <!-- Override Spring Boot 3.5.14's managed postgresql 42.7.10 to fix
              CVE-2026-42198 (unbounded PBKDF2 iterations in SCRAM auth, 7.5 high). -->
         <postgresql.version>42.7.11</postgresql.version>
+        <!-- Static analysis -->
+        <spotbugs-maven-plugin.version>4.8.6.6</spotbugs-maven-plugin.version>
+        <findsecbugs.version>1.13.0</findsecbugs.version>
+        <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
+        <checkstyle.version>10.21.0</checkstyle.version>
     </properties>
+
+    <!-- Override transitive vulnerable versions that the parent BOM doesn't
+         expose as a property (i.e., where setting <foo.version> doesn't take). -->
+    <dependencyManagement>
+        <dependencies>
+            <!-- commons-compress 1.24.0 (transitive via spring-boot-testcontainers
+                 → testcontainers core) is affected by:
+                   CVE-2024-25710 (8.1 high, infinite loop)
+                   CVE-2024-26308 (5.5 medium, unbounded resource allocation)
+                 Both fixed in 1.26.0+. 1.28.0 is the latest in the 1.x line. -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-compress</artifactId>
+                <version>1.28.0</version>
+            </dependency>
+            <!-- commons-lang3 3.17.0 (transitive via testcontainers core) is
+                 affected by CVE-2025-48924 (5.3). Fixed in 3.18.0+; 3.20.0 is
+                 the latest stable. -->
+            <dependency>
+                <groupId>org.apache.commons</groupId>
+                <artifactId>commons-lang3</artifactId>
+                <version>3.20.0</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -69,6 +100,21 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 
     <build>
@@ -76,6 +122,15 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+            <!-- Failsafe runs *IT.java in the integration-test phase, separating
+                 unit tests (surefire, *Test.java) from integration tests that
+                 require Docker (Testcontainers). Configuration comes from
+                 spring-boot-starter-parent's pluginManagement; we just opt in
+                 by declaring the plugin here. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
             </plugin>
             <plugin>
                 <groupId>org.openapitools</groupId>
@@ -93,9 +148,9 @@
                             <generatorName>spring</generatorName>
                             <library>spring-boot</library>
                             <output>${project.build.directory}/generated-sources/openapi</output>
-                            <apiPackage>com.example.spring_boot_postgresql_crud.api</apiPackage>
-                            <modelPackage>com.example.spring_boot_postgresql_crud.api.model</modelPackage>
-                            <invokerPackage>com.example.spring_boot_postgresql_crud.api</invokerPackage>
+                            <apiPackage>com.example.spring_boot_postgresql_crud.infrastructure.web</apiPackage>
+                            <modelPackage>com.example.spring_boot_postgresql_crud.infrastructure.web.dto</modelPackage>
+                            <invokerPackage>com.example.spring_boot_postgresql_crud.infrastructure.web</invokerPackage>
                             <modelNameSuffix>DTO</modelNameSuffix>
                             <generateModels>false</generateModels>
                             <generateApiTests>false</generateApiTests>
@@ -115,6 +170,69 @@
                                 <useSwaggerUI>false</useSwaggerUI>
                             </configOptions>
                         </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>com.github.spotbugs</groupId>
+                <artifactId>spotbugs-maven-plugin</artifactId>
+                <version>${spotbugs-maven-plugin.version}</version>
+                <configuration>
+                    <effort>Default</effort>
+                    <threshold>Medium</threshold>
+                    <failOnError>true</failOnError>
+                    <includeTests>true</includeTests>
+                    <excludeFilterFile>${project.basedir}/spotbugs-exclude.xml</excludeFilterFile>
+                    <plugins>
+                        <plugin>
+                            <groupId>com.h3xstream.findsecbugs</groupId>
+                            <artifactId>findsecbugs-plugin</artifactId>
+                            <version>${findsecbugs.version}</version>
+                        </plugin>
+                    </plugins>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotbugs-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-checkstyle-plugin</artifactId>
+                <version>${maven-checkstyle-plugin.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.puppycrawl.tools</groupId>
+                        <artifactId>checkstyle</artifactId>
+                        <version>${checkstyle.version}</version>
+                    </dependency>
+                </dependencies>
+                <configuration>
+                    <configLocation>${project.basedir}/checkstyle.xml</configLocation>
+                    <suppressionsLocation>${project.basedir}/checkstyle-suppressions.xml</suppressionsLocation>
+                    <consoleOutput>true</consoleOutput>
+                    <failsOnError>true</failsOnError>
+                    <linkXRef>false</linkXRef>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                    <sourceDirectories>
+                        <sourceDirectory>${project.basedir}/src/main/java</sourceDirectory>
+                    </sourceDirectories>
+                    <testSourceDirectories>
+                        <testSourceDirectory>${project.basedir}/src/test/java</testSourceDirectory>
+                    </testSourceDirectories>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>checkstyle-validate</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
                     </execution>
                 </executions>
             </plugin>
